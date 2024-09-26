@@ -3,7 +3,20 @@ use bytes::{Buf, BufMut};
 use std::{
     io::{Read, Write},
     net::TcpListener,
+    ops::RangeBounds,
 };
+
+#[derive(Copy, Clone, Debug)]
+struct RequestHeader {
+    _request_api_key: i16,
+    request_api_version: i16,
+    correlation_id: i32,
+}
+
+#[repr(i16)]
+enum ErrorCode {
+    UnsupportedVersion = 35,
+}
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:9092").unwrap();
@@ -20,13 +33,19 @@ fn main() {
                 stream.read_exact(&mut request).unwrap();
                 let mut request = request.as_slice();
 
-                let _request_api_key = request.get_i16();
-                let _request_api_version = request.get_i16();
-                let correlation_id = request.get_i32();
+                let header = RequestHeader {
+                    _request_api_key: request.get_i16(),
+                    request_api_version: request.get_i16(),
+                    correlation_id: request.get_i32(),
+                };
 
                 let mut response = Vec::with_capacity(8);
                 response.put_i32(0);
-                response.put_i32(correlation_id);
+                response.put_i32(header.correlation_id);
+
+                if !(0..=4).contains(&header.request_api_version) {
+                    response.put_i16(ErrorCode::UnsupportedVersion as i16);
+                }
 
                 stream.write_all(&response).unwrap();
             }
