@@ -1,2 +1,6 @@
 [tools]
 watchexec = 'latest'
+
+[tasks.dev]
+description = 'Run the dev server'
+run = "watchexec -r -e rs -w src -- cargo run"
