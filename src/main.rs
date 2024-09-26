@@ -8,8 +8,8 @@ use std::{
 
 #[derive(Copy, Clone, Debug)]
 struct RequestHeader {
-    _request_api_key: i16,
-    request_api_version: i16,
+    api_key: i16,
+    api_version: i16,
     correlation_id: i32,
 }
 
@@ -34,18 +34,39 @@ fn main() {
                 let mut request = request.as_slice();
 
                 let header = RequestHeader {
-                    _request_api_key: request.get_i16(),
-                    request_api_version: request.get_i16(),
+                    api_key: request.get_i16(),
+                    api_version: request.get_i16(),
                     correlation_id: request.get_i32(),
                 };
 
-                let mut response = Vec::with_capacity(8);
-                response.put_i32(0);
-                response.put_i32(header.correlation_id);
+                let mut body = Vec::new();
 
-                if !(0..=4).contains(&header.request_api_version) {
-                    response.put_i16(ErrorCode::UnsupportedVersion as i16);
+                match header.api_key {
+                    18 => {
+                        body.put_i32(header.correlation_id);
+
+                        let error_code = match !(0..=4).contains(&header.api_version) {
+                            true => ErrorCode::UnsupportedVersion as i16,
+                            false => 0_i16,
+                        };
+                        body.put_i16(error_code);
+
+                        body.put_i8(2); // num api key records + 1
+                        body.put_i16(18); // match the api key
+                        body.put_i16(0); // Minimum supported API version
+                        body.put_i16(4); // Max supported API version
+                        body.put_i8(0); // TAG_BUFFER length
+                        body.put_i32(420); // throttle time in ms
+                        body.put_i8(0); // TAG_BUFFER length
+                    }
+                    // NOTE: This is just to make clippy stop getting mad
+                    17 => {}
+                    _ => {}
                 }
+
+                let mut response = Vec::new();
+                response.put_i32(body.len().try_into().unwrap());
+                response.put(&body[..]);
 
                 stream.write_all(&response).unwrap();
             }
