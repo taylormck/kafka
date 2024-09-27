@@ -54,28 +54,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
 
                 let mut body = Vec::new();
+                body.put_i32(header.correlation_id);
 
-                match header.api_key {
-                    18 => {
-                        body.put_i32(header.correlation_id);
+                let error_code = match !(0..=4).contains(&header.api_version) {
+                    true => ErrorCode::UnsupportedVersion as i16,
+                    false => 0_i16,
+                };
+                body.put_i16(error_code);
 
-                        let error_code = match !(0..=4).contains(&header.api_version) {
-                            true => ErrorCode::UnsupportedVersion as i16,
-                            false => 0_i16,
-                        };
-                        body.put_i16(error_code);
+                if header.api_key == 18 {
+                    body.put_i8(3); // num api key records + 1
 
-                        body.put_i8(2); // num api key records + 1
-                        body.put_i16(18); // match the api key
-                        body.put_i16(0); // Minimum supported API version
-                        body.put_i16(4); // Max supported API version
-                        body.put_i8(0); // TAG_BUFFER length
-                        body.put_i32(420); // throttle time in ms
-                        body.put_i8(0); // TAG_BUFFER length
-                    }
-                    // NOTE: This is just to make clippy stop getting mad
-                    17 => {}
-                    _ => {}
+                    // APIVersions
+                    body.put_i16(18); //  APIVersions api key
+                    body.put_i16(0); // Minimum supported API version
+                    body.put_i16(4); // Max supported API version
+                    body.put_i8(0); // TAG_BUFFER length
+
+                    // FETCH
+                    body.put_i16(1); // FETCH api key
+                    body.put_i16(0); // Minimum supported fetch version
+                    body.put_i16(16); // Max supported fetch version
+                    body.put_i8(0); // TAG_BUFFER length
+
+                    body.put_i32(420); // throttle time in ms
+                    body.put_i8(0); // TAG_BUFFER length
                 }
 
                 let mut response = Vec::new();
