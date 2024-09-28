@@ -1,9 +1,10 @@
+use crate::ApiKey;
 use bytes::{Buf, BufMut, Bytes};
 use num_traits::FromPrimitive;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
-use tokio::io::{AsyncRead, AsyncReadExt /*, AsyncWrite, AsyncWriteExt*/};
-
-use crate::{ApiKey, KafkaError};
+mod api_versions;
+mod fetch;
 
 #[derive(Debug)]
 pub struct RequestHeader {
@@ -50,111 +51,8 @@ pub fn process_request(
     body_buffer.put_i32(header.correlation_id);
 
     match header.api_key {
-        ApiKey::ApiVersions => {
-            let error_code = match !(0..=4).contains(&header.api_version) {
-                true => KafkaError::UnsupportedVersion as i16,
-                false => 0_i16,
-            };
-            body_buffer.put_i16(error_code);
-
-            body_buffer.put_i8(3); // num api key records + 1
-
-            // APIVersions
-            body_buffer.put_i16(18); //  ApiVersions api key
-            body_buffer.put_i16(0); // Minimum supported API version
-            body_buffer.put_i16(4); // Max supported API version
-            body_buffer.put_i8(0); // TAG_BUFFER length
-
-            // FETCH
-            body_buffer.put_i16(1); // Fetch api key
-            body_buffer.put_i16(0); // Minimum supported fetch version
-            body_buffer.put_i16(16); // Max supported fetch version
-            body_buffer.put_i8(0); // TAG_BUFFER length
-
-            body_buffer.put_i32(420); // throttle time in ms
-            body_buffer.put_i8(0); // TAG_BUFFER length
-        }
-        ApiKey::Fetch => {
-            // Read request
-            //
-            let _max_wait_ms = request_buffer.get_i32();
-            let _min_bytes = request_buffer.get_i32();
-            let _max_bytes = request_buffer.get_i32();
-            let _isolation_level = request_buffer.get_i8();
-            let _session_id = request_buffer.get_i32();
-            let _session_epoch = request_buffer.get_i32();
-
-            let topic_count = request_buffer.get_u8().saturating_sub(1);
-            let mut topics = Vec::with_capacity(topic_count.into());
-
-            for _ in 0..topic_count {
-                // topic_id is actually a UUID, but we don't need
-                // to decode it, so we just treat it like a big int.
-                let topic_id = request_buffer.get_u128();
-
-                let partition_count = request_buffer.get_u8().saturating_sub(1);
-
-                // NOTE: we'll need this once we start processing the data.
-                // let mut partitions = Vec::with_capacity(partition_count);
-
-                for _ in 0..partition_count {
-                    let _partition = request_buffer.get_i32();
-                    let _current_leader_epoch = request_buffer.get_i32();
-                    let _fetch_offset = request_buffer.get_i64();
-                    let _last_fetched_epoch = request_buffer.get_i32();
-                    let _log_start_offset = request_buffer.get_i64();
-                    let _partition_max_bytes = request_buffer.get_i32();
-                    request_buffer.advance(1); // TAG_BUFFER
-                }
-                request_buffer.advance(1); // TAG_BUFFER
-
-                topics.push(topic_id);
-            }
-
-            let forgotten_topics_data_count = request_buffer.get_u8().saturating_sub(1);
-
-            for _ in 0..forgotten_topics_data_count {
-                let _topic_id = request_buffer.get_u128();
-                let _partitions = request_buffer.get_i32();
-                request_buffer.advance(1); // TAG_BUFFER
-            }
-
-            let _rack_id_len = request_buffer.get_u8() - 1;
-            request_buffer.advance(1); // TAG_BUFFER
-
-            body_buffer.put_u8(0); // TAG_BUFFER
-            body_buffer.put_i32(420); // throttle time in ms
-
-            let error_code = match !(0..=16).contains(&header.api_version) {
-                true => KafkaError::UnsupportedVersion as i16,
-                false => 0_i16,
-            };
-            body_buffer.put_i16(error_code);
-            body_buffer.put_i32(0); // session_id
-
-            body_buffer.put_u8(topics.len() as u8 + 1); // number of responses, but the tag buffer
-
-            for topic_id in topics {
-                body_buffer.put_u128(topic_id);
-
-                // NOTE: these are dummy values for now.
-                body_buffer.put_u8(2); // partitions
-                body_buffer.put_u32(0); // index
-                body_buffer.put_u16(KafkaError::UnknownTopic as u16);
-                body_buffer.put_u64(0);
-                body_buffer.put_u64(0);
-                body_buffer.put_u64(0);
-                body_buffer.put_u8(0);
-                body_buffer.put_u32(0);
-                body_buffer.put_u8(1);
-
-                // Double TAG_BUFFER
-                body_buffer.put_u8(0);
-                body_buffer.put_u8(0);
-            }
-
-            body_buffer.put_u8(0); // TAG_BUFFER
-        }
+        ApiKey::ApiVersions => api_versions::process(&header.api_version, &mut body_buffer),
+        ApiKey::Fetch => fetch::process(&header.api_version, request_buffer, &mut body_buffer),
         ApiKey::Produce => {
             // todo!();
         }
@@ -164,5 +62,6 @@ pub fn process_request(
     let mut response = Vec::new();
     response.put_i32(body_buffer.len().try_into().unwrap());
     response.put(&body_buffer[..]);
+
     Ok(response)
 }
