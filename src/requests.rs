@@ -1,6 +1,8 @@
 use crate::ApiKey;
+use anyhow::Result;
 use bytes::{Buf, BufMut, Bytes};
 use num_traits::FromPrimitive;
+use std::marker::Unpin;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 mod api_versions;
@@ -16,10 +18,10 @@ pub struct RequestHeader {
 
 pub async fn read_request_length(
     length_buffer: &mut [u8; 4],
-    stream: &mut (impl AsyncRead + std::marker::Unpin),
-) -> Result<usize, Box<dyn std::error::Error>> {
+    stream: &mut (impl AsyncRead + Unpin),
+) -> Result<usize> {
     if let Err(err) = stream.read_exact(length_buffer).await {
-        return Err(Box::new(err));
+        anyhow::bail!("Error while reading request: {}", err);
     }
 
     Ok(i32::from_be_bytes(*length_buffer) as usize)
@@ -43,24 +45,25 @@ pub fn read_request_header(buffer: &mut dyn Buf) -> RequestHeader {
     header
 }
 
-pub fn process_request(
-    header: &RequestHeader,
-    request_buffer: &mut dyn Buf,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn process_request(header: &RequestHeader, request_buffer: &mut dyn Buf) -> Result<Vec<u8>> {
     let mut body_buffer = Vec::new();
     body_buffer.put_i32(header.correlation_id);
 
     match header.api_key {
         ApiKey::ApiVersions => api_versions::process(&header.api_version, &mut body_buffer),
         ApiKey::Fetch => fetch::process(&header.api_version, request_buffer, &mut body_buffer),
+        ApiKey::DescribeTopicPartitions => {
+            todo!();
+        }
         ApiKey::Produce => {
-            // todo!();
+            todo!();
         }
         ApiKey::None => {}
     }
 
-    let mut response = Vec::new();
-    response.put_i32(body_buffer.len().try_into().unwrap());
+    let body_length = body_buffer.len();
+    let mut response = Vec::with_capacity(body_length + 4);
+    response.put_i32(body_length as i32);
     response.put(&body_buffer[..]);
 
     Ok(response)

@@ -1,8 +1,9 @@
+use std::marker::Unpin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::requests;
 
-pub async fn process_stream(stream: &mut (impl AsyncRead + AsyncWrite + std::marker::Unpin)) {
+pub async fn process_stream(stream: &mut (impl AsyncRead + AsyncWrite + Unpin)) {
     let mut len_buf = [0_u8; 4];
 
     loop {
