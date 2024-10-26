@@ -1,4 +1,4 @@
-use crate::KafkaError;
+use crate::{api_key::ApiKey, KafkaError};
 use bytes::BufMut;
 
 pub fn process(api_version: &i16, output: &mut dyn BufMut) {
@@ -9,7 +9,7 @@ pub fn process(api_version: &i16, output: &mut dyn BufMut) {
 
     output.put_i16(error_code);
 
-    output.put_i8(3); // num api key records + 1
+    output.put_i8(2); // num api key records + 1
 
     // APIVersions
     output.put_i16(18); //  ApiVersions api key
@@ -21,6 +21,12 @@ pub fn process(api_version: &i16, output: &mut dyn BufMut) {
     output.put_i16(1); // Fetch api key
     output.put_i16(0); // Minimum supported fetch version
     output.put_i16(16); // Max supported fetch version
+    output.put_i8(0); // TAG_BUFFER length
+
+    // DescribeTopicPartitions
+    output.put_i16(75); // DescribeTopicPartitions api key
+    output.put_i16(0); // max supported version
+    output.put_i16(0); // min supported version
     output.put_i8(0); // TAG_BUFFER length
 
     output.put_i32(420); // throttle time in ms
