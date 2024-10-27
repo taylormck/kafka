@@ -9,7 +9,7 @@ pub fn process(api_version: i16, output: &mut dyn BufMut) {
 
     output.put_i16(error_code);
 
-    output.put_i8(2); // num api key records + 1
+    output.put_i8(4); // num api key records + 1
 
     // APIVersions
     output.put_i16(18); //  ApiVersions api key
