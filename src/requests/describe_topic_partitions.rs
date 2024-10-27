@@ -10,7 +10,13 @@ pub fn process(_api_version: i16, input: &mut (impl Buf + ?Sized), output: &mut 
     }
 
     let _response_partition_limit = input.get_i32();
-    let _cursor = Cursor::read_from_buffer(input);
+
+    // Because the cursor is maybe a NULLABLE_BYTES or COMPACT_NULLABLE_BYTES
+    // or some other bullshit, we only need to read -1 as a u8.
+    let cursor = input.get_u8();
+    assert_eq!(cursor, 0xff);
+
+    input.advance(1); // TAG_BUFFER
 
     output.put_u8(0); // TAG BUFFER
     output.put_i32(0); // throttle_time
@@ -29,10 +35,9 @@ pub fn process(_api_version: i16, input: &mut (impl Buf + ?Sized), output: &mut 
         output.put_u8(0); // TAG_BUFFER
     }
 
-    // next_cursor
-    write_compact_string(output, "fake_topic_name");
-    output.put_i32(0); // partition_index
-    output.put_u8(0); // next_cursor TAG_BUFFER
+    // Because the cursor is maybe a NULLABLE_BYTES or COMPACT_NULLABLE_BYTES
+    // or some other bullshit, we only need to write -1 as a u8.
+    output.put_u8(0xff);
 
     output.put_u8(0); // final TAG_BUFFER
 }
@@ -43,35 +48,30 @@ struct Topic {
 
 impl Topic {
     pub fn read_from_buffer(input: &mut (impl Buf + ?Sized)) -> Self {
-        let string_length = input.get_u8().saturating_sub(1);
-        let mut buffer = vec![];
+        let name = read_compact_string(input);
+        input.advance(1); // TAG_BUFFER
 
-        for _ in 0..string_length {
-            buffer.push(input.get_u8());
-        }
-
-        Self {
-            name: read_compact_string(input),
-        }
+        Self { name }
     }
 }
 
-struct Cursor {
-    _topic_name: String,
-    _partition_index: i32,
-}
-
-impl Cursor {
-    pub fn read_from_buffer(input: &mut (impl Buf + ?Sized)) -> Self {
-        let topic_name = read_compact_string(input);
-        let partition_index = input.get_i32();
-
-        Self {
-            _topic_name: topic_name,
-            _partition_index: partition_index,
-        }
-    }
-}
+// struct Cursor {
+//     _topic_name: String,
+//     _partition_index: i32,
+// }
+//
+// impl Cursor {
+//     pub fn read_from_buffer(input: &mut (impl Buf + ?Sized)) -> Self {
+//         let topic_name = read_compact_string(input);
+//         let partition_index = input.get_i32();
+//         input.advance(1); // TAG_BUFFER
+//
+//         Self {
+//             _topic_name: topic_name,
+//             _partition_index: partition_index,
+//         }
+//     }
+// }
 
 fn read_compact_string(input: &mut (impl Buf + ?Sized)) -> String {
     let string_length = input.get_u8().saturating_sub(1);

@@ -1,4 +1,4 @@
-use crate::{api_key::ApiKey, KafkaError};
+use crate::KafkaError;
 use bytes::BufMut;
 
 pub fn process(api_version: i16, output: &mut dyn BufMut) {
