@@ -6,6 +6,7 @@ use std::marker::Unpin;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 mod api_versions;
+mod describe_topic_partitions;
 mod fetch;
 
 #[derive(Debug)]
@@ -50,10 +51,10 @@ pub fn process_request(header: &RequestHeader, request_buffer: &mut dyn Buf) -> 
     body_buffer.put_i32(header.correlation_id);
 
     match header.api_key {
-        ApiKey::ApiVersions => api_versions::process(&header.api_version, &mut body_buffer),
-        ApiKey::Fetch => fetch::process(&header.api_version, request_buffer, &mut body_buffer),
+        ApiKey::ApiVersions => api_versions::process(header.api_version, &mut body_buffer),
+        ApiKey::Fetch => fetch::process(header.api_version, request_buffer, &mut body_buffer),
         ApiKey::DescribeTopicPartitions => {
-            todo!();
+            describe_topic_partitions::process(header.api_version, request_buffer, &mut body_buffer)
         }
         ApiKey::Produce => {
             todo!();

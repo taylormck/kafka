@@ -1,7 +1,7 @@
 use crate::KafkaError;
 use bytes::{Buf, BufMut};
 
-pub fn process(api_version: &i16, input: &mut (impl Buf + ?Sized), output: &mut impl BufMut) {
+pub fn process(api_version: i16, input: &mut (impl Buf + ?Sized), output: &mut impl BufMut) {
     let _max_wait_ms = input.get_i32();
     let _min_bytes = input.get_i32();
     let _max_bytes = input.get_i32();
@@ -31,7 +31,7 @@ pub fn process(api_version: &i16, input: &mut (impl Buf + ?Sized), output: &mut 
     output.put_u8(0); // TAG_BUFFER
     output.put_i32(0); // throttle time in ms
 
-    let error_code = match !(0..=16).contains(api_version) {
+    let error_code = match !(0..=16).contains(&api_version) {
         true => KafkaError::UnsupportedVersion as i16,
         false => 0_i16,
     };

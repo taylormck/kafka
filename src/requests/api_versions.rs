@@ -1,8 +1,8 @@
 use crate::{api_key::ApiKey, KafkaError};
 use bytes::BufMut;
 
-pub fn process(api_version: &i16, output: &mut dyn BufMut) {
-    let error_code = match !(0..=4).contains(api_version) {
+pub fn process(api_version: i16, output: &mut dyn BufMut) {
+    let error_code = match !(0..=4).contains(&api_version) {
         true => KafkaError::UnsupportedVersion as i16,
         false => 0_i16,
     };
@@ -25,8 +25,8 @@ pub fn process(api_version: &i16, output: &mut dyn BufMut) {
 
     // DescribeTopicPartitions
     output.put_i16(75); // DescribeTopicPartitions api key
-    output.put_i16(0); // max supported version
     output.put_i16(0); // min supported version
+    output.put_i16(0); // max supported version
     output.put_i8(0); // TAG_BUFFER length
 
     output.put_i32(420); // throttle time in ms
