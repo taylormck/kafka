@@ -1,5 +1,9 @@
 use crate::KafkaError;
 use bytes::{Buf, BufMut};
+use std::{fs::File, io::BufReader};
+
+const METADATA_FILE_LOCATION: &str =
+    "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log";
 
 pub fn process(_api_version: i16, input: &mut (impl Buf + ?Sized), output: &mut impl BufMut) {
     let num_topics = input.get_u8().saturating_sub(1);
@@ -15,6 +19,10 @@ pub fn process(_api_version: i16, input: &mut (impl Buf + ?Sized), output: &mut 
     // or some other bullshit, we only need to read -1 as a u8.
     let cursor = input.get_u8();
     assert_eq!(cursor, 0xff);
+
+    let metadata_log_file = File::open(METADATA_FILE_LOCATION).unwrap();
+    let metadata_size = metadata_log_file.metadata().unwrap().len();
+    let mut reader = BufReader::new(metadata_log_file);
 
     input.advance(1); // TAG_BUFFER
 
